@@ -1,0 +1,14 @@
+# .gitignore
+# python
+__pycache__
+*.py[cod]
+
+# poetry
+poetry.lock
+pyproject.toml
+
+
+# testing
+.coverage
+htmlcov/
+.pytest_cache/
