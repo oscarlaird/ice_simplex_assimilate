@@ -64,7 +64,11 @@ def process_sample(raw_sample: RawSample, h_bnd: HeightBounds) -> NDArray[np.flo
 
 
 def process_ensemble(raw_ensemble: List[RawSample], h_bnd: HeightBounds) -> NDArray[np.float64]:
-    return np.array([process_sample(raw_sample, h_bnd) for raw_sample in raw_ensemble.samples], dtype=np.float64)
+    return np.array([process_sample(raw_sample, h_bnd) for raw_sample in raw_ensemble], dtype=np.float64)
+
+def build_raw_ensemble(area: np.ndarray, volume: np.ndarray) -> List[RawSample]:
+    assert area.shape == volume.shape
+    return [RawSample(area=area, volume=volume) for area, volume in zip(area, volume)]
 
 
 # CONVERT BACK TO RAW FORM
