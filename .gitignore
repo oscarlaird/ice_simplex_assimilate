@@ -5,6 +5,7 @@ __pycache__
 
 # poetry
 poetry.lock
+/ice-simplex-assimilate-LgWSwnTq-py3.11/
 
 # testing
 .coverage
