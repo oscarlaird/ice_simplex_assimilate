@@ -5,8 +5,6 @@ __pycache__
 
 # poetry
 poetry.lock
-pyproject.toml
-
 
 # testing
 .coverage
