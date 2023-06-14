@@ -18,10 +18,8 @@ class RawSample:
 
     def threshold(self, a=None, v=None, s=None):
         """ Set area, volume, or snow to zero if below the given threshold """
-        if a:
-            self.area[self.area < a] = 0.
-        if v:
-            self.volume[self.volume < v] = 0.
+        self.area[self.area < a] = 0.
+        self.volume[self.volume < v] = 0.
         if s:
             self.snow[self.snow < s] = 0.
 
@@ -78,7 +76,7 @@ def post_process_sample(sample: NDArray[np.float64], h_bnd: HeightBounds) -> Raw
     return RawSample(area=np.array(a), volume=np.array(v), snow=np.zeros_like(a))
 
 
-def post_process_ensemble(ensemble: np.NDArray[np.float64], h_bnd: HeightBounds) -> List[RawSample]:
+def post_process_ensemble(ensemble: NDArray[np.float64], h_bnd: HeightBounds) -> List[RawSample]:
     raw_samples = []
     for sample in ensemble:
         raw_samples.append(post_process_sample(sample, h_bnd=h_bnd))
