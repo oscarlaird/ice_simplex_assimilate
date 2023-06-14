@@ -24,7 +24,6 @@ def sample_class_strategy(draw, num_components):
 
 @st.composite
 def sample_strategy(draw, num_components=None, using_sample_class=None):
-    # todo this allows nonzero and zero mass in the same thickness interval
     if num_components is None:
         num_components = draw(st.integers(min_value=1, max_value=10))
     if using_sample_class is None:
