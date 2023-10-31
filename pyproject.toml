@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "ice-simplex-assimilate"
+version = "0.1.16"
+description = ""
+authors = ["Oscar Laird <olaird25@gmail.com>"]
+readme = "README.md"
+packages = [{include = "ice_simplex_assimilate"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+pytest = "^7.3.2"
+simplex-assimilate = "^0.2.0"
+tqdm = "^4.65.0"
+
+[tool.poetry.group.dev.dependencies]
+simplex-assimilate = {path = "/home/oscar/grooms/simplex_assimilate"}
+pytest-cov = "^4.1.0"
+jupyter = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

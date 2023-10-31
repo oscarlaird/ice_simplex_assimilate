@@ -1,16 +1,10 @@
 import unittest
 from ice_simplex_assimilate import *
+from simplex_assimilate.fixed_point import ONE
 
 class TestProcess(unittest.TestCase):
 
     height_bounds = HeightBounds(np.array([0.0, 2.0, 4.0]))
-
-    def test_quantize(self):
-        """ Quantized samples sum to ONE (2<<31)"""
-        samples = np.random.random((100, 11))
-        samples = samples / samples.sum(axis=1, keepdims=True)
-        samples = quantize(samples)
-        self.assertTrue(np.all(samples.sum(axis=1) == ONE))
 
     def test_check_raw_sample_legal(self):
         area = np.array([0.5, 0.5])

@@ -2,10 +2,11 @@ import numpy as np
 from numpy.typing import NDArray
 import warnings
 
-from simplex_assimilate.utils.quantize import quantize
-from simplex_assimilate.fixed_point import ONE
+from simplex_assimilate import fixed_point
+from simplex_assimilate.utils import quantize
+from simplex_assimilate.transport import transport as transport_processed_ensemble
 
-OUTPUT_WARN_THRESHOLD = int(1e-9 * ONE)
+OUTPUT_WARN_THRESHOLD = int(1e-9 * fixed_point.ONE)
 
 class HeightBounds(np.ndarray):
     min_interval = 1e-7
@@ -58,6 +59,14 @@ def pre_process_sample(area: NDArray[np.float32], volume: NDArray[np.float32], h
     5. Quantize to 32-bit fixed point
     """
     # 1. Assert that the area, volume, and height bounds have legal values (ah₁ ≤ v ≤ ah₂)
+    # if we are outside of the legal bounds, clip the volumes to the legal bounds
+    volume_before = volume.copy()
+    lower_bounds = np.array([interval[0] for interval in height_bounds.intervals]) * area
+    upper_bounds = np.array([interval[1] for interval in height_bounds.intervals]) * area
+    volume = np.clip(volume, lower_bounds, upper_bounds)
+    if not np.all(volume == volume_before):
+        warnings.warn(f"Warning: input sample contains components outside of legal bounds: {volume_before} -> {volume}"
+                      "Clipping to legal bounds.")
     assert check_raw_sample_legal(area, volume, height_bounds)
     # 2. Convert to deltized form using the height bounds.
     x = np.zeros(2 * len(height_bounds.intervals) + 1, dtype=np.float32)
@@ -83,7 +92,7 @@ def pre_process_sample(area: NDArray[np.float32], volume: NDArray[np.float32], h
     x *= area_before / x.sum() # insure thresholding doesn't change the amount of ice_area
     x[0] = max(0, 1 - x.sum())  # first component is open water. How much isn't covered in ice?
     # 5. Quantize to 32-bit fixed point
-    return quantize(x[None, :])[0]
+    return quantize.quantize(x[None, :])[0]
 
 
 def post_process_sample(sample: NDArray[np.uint32], height_bounds: HeightBounds) -> (
@@ -101,12 +110,13 @@ def post_process_sample(sample: NDArray[np.uint32], height_bounds: HeightBounds)
     3. Dequantize to floating point
     """
     # 1. Assert that the deltized sample sums to 1
-    assert sample.sum() == ONE
+    assert sample.sum() == fixed_point.ONE
     # 2. Warn if any component is less than 1e-9, but greater than zero.
     if np.any((0 < sample) & (sample < OUTPUT_WARN_THRESHOLD)):
         warnings.warn(f"Warning: output sample contains components less than 1e-9: {sample}")
     # 3. Dequantize to floating point
-    x = sample.astype(np.float32) / ONE
+    # TODO: I AM USING 64-bit to avoid the aggregate ice area error in forecasting.
+    x = sample.astype(np.float64) / fixed_point.ONE
     # 4. Convert to raw form
     area = np.zeros(len(height_bounds.intervals), dtype=np.float32)
     volume = np.zeros(len(height_bounds.intervals), dtype=np.float32)
@@ -116,6 +126,18 @@ def post_process_sample(sample: NDArray[np.uint32], height_bounds: HeightBounds)
         M = np.array([[1., 1., ],
                       interval])
         area[i], volume[i] = M @ np.array([l_mass, u_mass])
+    # rounding errors may cause the area to be slightly greater than 1.0. We need to renormalize
+    # and then clip to the legal bounds if we have shifted outside of them
+    MAX_AREA = 1 - 1e-6  # TODO this makes the open water always at least 1e-6. Is this ok?
+    if area.sum() > MAX_AREA:
+        print('Clipping total area to ', MAX_AREA)
+        area *= (MAX_AREA / area.sum())
+    epsilon = 1e-5  # minimum fraction that can be on one side of the interval
+    # TODO: this is done to ensure volumes are in the legal bounds. Is this necessary?
+    lower_bounds = np.array([(1-epsilon)*interval[0] + epsilon*interval[1] for interval in height_bounds.intervals]) * area
+    upper_bounds = np.array([(1-epsilon)*interval[1] + epsilon*interval[0] for interval in height_bounds.intervals]) * area
+    volume = np.clip(volume, lower_bounds, upper_bounds)
+    assert np.isclose(area.sum(), MAX_AREA) or area.sum() < MAX_AREA, f"Area sum is {area.sum()}"
     return area, volume
 
 
@@ -127,7 +149,16 @@ def pre_process_ensemble(areas: NDArray[np.float32], volumes: NDArray[np.float32
     return vectorized_pps(areas, volumes, height_bounds=height_bounds, threshold=threshold)
 
 
-def post_process_ensemble(ensemble: NDArray[np.uint32], height_bounds: HeightBounds) -> NDArray[np.float32]:
+def post_process_ensemble(ensemble: NDArray[np.uint32], height_bounds: HeightBounds) -> (NDArray[np.float32], NDArray[np.float32]):
+    """ Apply post_process_sample to a batch of samples """
     vectorized_pps = np.vectorize(post_process_sample, signature='(n)->(m),(m)', excluded=['height_bounds'])
     return vectorized_pps(ensemble, height_bounds=height_bounds)
+
+def transport(areas: NDArray[np.float32], volumes: NDArray[np.float32], observations: NDArray[np.float32], height_bounds: HeightBounds) -> (NDArray[np.float32], NDArray[np.float32]):
+    """ Apply transport to a batch of samples """
+    observations = (fixed_point.ONE * observations).astype(np.uint32)
+    samples = pre_process_ensemble(areas, volumes, height_bounds)
+    post_samples = transport_processed_ensemble(samples, observations)
+    short_samples = np.where(post_samples.sum(axis=1) < fixed_point.ONE)
+    return post_process_ensemble(post_samples, height_bounds)
 
