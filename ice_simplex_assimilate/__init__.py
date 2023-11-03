@@ -89,7 +89,8 @@ def pre_process_sample(area: NDArray[np.float32], volume: NDArray[np.float32], h
                 r = threshold
         x[2 * i + 1] = l
         x[2 * i + 2] = r
-    x *= area_before / x.sum() # insure thresholding doesn't change the amount of ice_area
+    if x.sum() > 0:
+        x *= area_before / x.sum() # insure thresholding doesn't change the amount of ice_area
     x[0] = max(0, 1 - x.sum())  # first component is open water. How much isn't covered in ice?
     # 5. Quantize to 32-bit fixed point
     return quantize.quantize(x[None, :])[0]
